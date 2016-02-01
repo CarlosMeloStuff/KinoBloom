@@ -128,6 +128,33 @@ Shader "Hidden/Kino/Bloom"
         return half4(s, 0);
     }
 
+    half4 frag_box_reduce2(v2f_img i) : SV_Target
+    {
+        float4 d = _MainTex_TexelSize.xyxy * float4(1, 1, -1, 0);
+
+        float3 s;
+
+        half3 s1 = tex2D(_MainTex, i.uv - d.xy).rgb;
+        half3 s2 = tex2D(_MainTex, i.uv - d.zy).rgb;
+        half3 s3 = tex2D(_MainTex, i.uv + d.zy).rgb;
+        half3 s4 = tex2D(_MainTex, i.uv + d.xy).rgb;
+
+        float s1w = 1.0 / (1.0 + luma(s1));
+        float s2w = 1.0 / (1.0 + luma(s2));
+        float s3w = 1.0 / (1.0 + luma(s3));
+        float s4w = 1.0 / (1.0 + luma(s4));
+
+        float iw = 1.0 / (s1w + s2w + s3w + s4w);
+
+        s1 *= s1w * iw;
+        s2 *= s2w * iw;
+        s3 *= s3w * iw;
+        s4 *= s4w * iw;
+
+        s = s1 + s2 + s3 + s4;
+        return half4(s, 0);
+    }
+
     half4 frag_tent_expand(v2f_img i) : SV_Target
     {
         float4 d = _MainTex_TexelSize.xyxy * float4(1, 1, -1, 0) * _SampleScale;
@@ -200,6 +227,15 @@ Shader "Hidden/Kino/Bloom"
             CGPROGRAM
             #pragma vertex vert_img
             #pragma fragment frag_combine
+            #pragma target 3.0
+            ENDCG
+        }
+        Pass
+        {
+            ZTest Always Cull Off ZWrite Off
+            CGPROGRAM
+            #pragma vertex vert_img
+            #pragma fragment frag_box_reduce2
             #pragma target 3.0
             ENDCG
         }

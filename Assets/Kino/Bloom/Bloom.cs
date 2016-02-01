@@ -179,7 +179,8 @@ namespace Kino
             Graphics.Blit(source, rt1[0], _material, 0);
 
             // create a mip pyramid
-            for (var i = 0; i < iteration; i++)
+            Graphics.Blit(rt1[0], rt1[1], _material, 4);
+            for (var i = 1; i < iteration; i++)
                 Graphics.Blit(rt1[i], rt1[i + 1], _material, 1);
 
             // blur and combine loop
