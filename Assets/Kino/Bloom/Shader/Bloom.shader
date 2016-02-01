@@ -96,15 +96,36 @@ Shader "Hidden/Kino/Bloom"
 
     half4 frag_box_reduce(v2f_img i) : SV_Target
     {
-        float4 d = _MainTex_TexelSize.xyxy * float4(-1, -1, +1, +1);
+        float4 d = _MainTex_TexelSize.xyxy * float4(1, 1, -1, 0);
 
         float3 s;
-        s  = tex2D(_MainTex, i.uv + d.xy).rgb;
+#if 0
+        s  = tex2D(_MainTex, i.uv - d.xy).rgb;
+        s += tex2D(_MainTex, i.uv - d.zy).rgb;
         s += tex2D(_MainTex, i.uv + d.zy).rgb;
-        s += tex2D(_MainTex, i.uv + d.xw).rgb;
-        s += tex2D(_MainTex, i.uv + d.zw).rgb;
+        s += tex2D(_MainTex, i.uv + d.xy).rgb;
+        s *= 0.25;
+#else
+        s  = tex2D(_MainTex, i.uv).rgb * 0.125;
 
-        return half4(s * 0.25, 0);
+        s += tex2D(_MainTex, i.uv - d.xy).rgb * (0.5 * 0.25);
+        s += tex2D(_MainTex, i.uv - d.zy).rgb * (0.5 * 0.25);
+        s += tex2D(_MainTex, i.uv + d.zy).rgb * (0.5 * 0.25);
+        s += tex2D(_MainTex, i.uv + d.xy).rgb * (0.5 * 0.25);
+
+        s += tex2D(_MainTex, i.uv - d.xy * 2).rgb * (0.125 * 0.25);
+        s += tex2D(_MainTex, i.uv - d.wy * 2).rgb * (0.125 * 0.5);
+        s += tex2D(_MainTex, i.uv - d.zy * 2).rgb * (0.125 * 0.25);
+
+        s += tex2D(_MainTex, i.uv - d.xw * 2).rgb * (0.125 * 0.5);
+        s += tex2D(_MainTex, i.uv + d.xw * 2).rgb * (0.125 * 0.5);
+
+        s += tex2D(_MainTex, i.uv + d.zy * 2).rgb * (0.125 * 0.25);
+        s += tex2D(_MainTex, i.uv + d.wy * 2).rgb * (0.125 * 0.5);
+        s += tex2D(_MainTex, i.uv + d.xy * 2).rgb * (0.125 * 0.25);
+#endif
+
+        return half4(s, 0);
     }
 
     half4 frag_tent_expand(v2f_img i) : SV_Target
