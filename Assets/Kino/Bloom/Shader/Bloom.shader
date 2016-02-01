@@ -99,7 +99,7 @@ Shader "Hidden/Kino/Bloom"
         float4 d = _MainTex_TexelSize.xyxy * float4(1, 1, -1, 0);
 
         float3 s;
-#if 0
+#if 1
         s  = tex2D(_MainTex, i.uv - d.xy).rgb;
         s += tex2D(_MainTex, i.uv - d.zy).rgb;
         s += tex2D(_MainTex, i.uv + d.zy).rgb;
@@ -139,19 +139,48 @@ Shader "Hidden/Kino/Bloom"
         half3 s3 = tex2D(_MainTex, i.uv + d.zy).rgb;
         half3 s4 = tex2D(_MainTex, i.uv + d.xy).rgb;
 
+        half3 s11 = tex2D(_MainTex, i.uv - d.xy * 2).rgb;
+        half3 s12 = tex2D(_MainTex, i.uv - d.wy * 2).rgb;
+        half3 s13 = tex2D(_MainTex, i.uv - d.zy * 2).rgb;
+
+        half3 s21 = tex2D(_MainTex, i.uv - d.xw * 2).rgb;
+        half3 s22 = tex2D(_MainTex, i.uv           ).rgb;
+        half3 s23 = tex2D(_MainTex, i.uv + d.xw * 2).rgb;
+
+        half3 s31 = tex2D(_MainTex, i.uv + d.zy * 2).rgb;
+        half3 s32 = tex2D(_MainTex, i.uv + d.wy * 2).rgb;
+        half3 s33 = tex2D(_MainTex, i.uv + d.xy * 2).rgb;
+
         float s1w = 1.0 / (1.0 + luma(s1));
         float s2w = 1.0 / (1.0 + luma(s2));
         float s3w = 1.0 / (1.0 + luma(s3));
         float s4w = 1.0 / (1.0 + luma(s4));
 
-        float iw = 1.0 / (s1w + s2w + s3w + s4w);
+        float s11w = 1.0 / (1.0 + luma(s11));
+        float s12w = 1.0 / (1.0 + luma(s12));
+        float s13w = 1.0 / (1.0 + luma(s13));
 
-        s1 *= s1w * iw;
-        s2 *= s2w * iw;
-        s3 *= s3w * iw;
-        s4 *= s4w * iw;
+        float s21w = 1.0 / (1.0 + luma(s21));
+        float s22w = 1.0 / (1.0 + luma(s22));
+        float s23w = 1.0 / (1.0 + luma(s23));
 
-        s = s1 + s2 + s3 + s4;
+        float s31w = 1.0 / (1.0 + luma(s31));
+        float s32w = 1.0 / (1.0 + luma(s32));
+        float s33w = 1.0 / (1.0 + luma(s33));
+
+        float iw1 = 0.5 / (s1w + s2w + s3w + s4w);
+        float iw2 = 0.125 / (s11w + s12w + s21w + s22w);
+        float iw3 = 0.125 / (s12w + s13w + s22w + s23w);
+        float iw4 = 0.125 / (s21w + s22w + s31w + s32w);
+        float iw5 = 0.125 / (s22w + s23w + s32w + s33w);
+
+        s =
+            (s1 * s1w + s2 * s2w + s3 * s3w + s4 * s4w) * iw1 +
+            (s11 * s11w + s12 * s12w + s21 * s21w + s22 * s22w) * iw2 +
+            (s12 * s12w + s13 * s13w + s22 * s22w + s23 * s23w) * iw3 +
+            (s21 * s21w + s22 * s22w + s31 * s31w + s32 * s32w) * iw4 +
+            (s22 * s22w + s23 * s23w + s32 * s32w + s33 * s33w) * iw5;
+
         return half4(s, 0);
     }
 
