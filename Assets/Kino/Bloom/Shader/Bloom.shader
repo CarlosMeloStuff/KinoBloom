@@ -69,16 +69,45 @@ Shader "Hidden/Kino/Bloom"
     half3 limit_hdr(half3 c) { return min(c, 65000); }
     half4 limit_hdr(half4 c) { return min(c, 65000); }
 
+#if 1
+
+    half4 encode_hdr(half3 rgb)
+    {
+        rgb *= 0.5;
+        float m = max(max(rgb.r, rgb.g), max(rgb.b, 1e-6));
+        m = ceil(m * 255) / 255;
+        return half4(rgb / m, m);
+    }
+
+    half3 decode_hdr(half4 rgbm)
+    {
+        return rgbm.rgb * rgbm.a * 2;
+    }
+
+#else
+
+    half4 encode_hdr(half3 rgb)
+    {
+        return half4(rgb, 0);
+    }
+
+    half3 decode_hdr(half4 rgba)
+    {
+        return rgba.rgb;
+    }
+
+#endif
+
     // Downsampler with 4x4 box filter
     half3 downsample_box4x4(float2 uv)
     {
         float4 d = _MainTex_TexelSize.xyxy * float4(-1, -1, +1, +1);
 
         half3 s;
-        s  = tex2D(_MainTex, uv + d.xy).rgb;
-        s += tex2D(_MainTex, uv + d.zy).rgb;
-        s += tex2D(_MainTex, uv + d.xw).rgb;
-        s += tex2D(_MainTex, uv + d.zw).rgb;
+        s  = decode_hdr(tex2D(_MainTex, uv + d.xy));
+        s += decode_hdr(tex2D(_MainTex, uv + d.zy));
+        s += decode_hdr(tex2D(_MainTex, uv + d.xw));
+        s += decode_hdr(tex2D(_MainTex, uv + d.zw));
 
         return s * (1.0 / 4);
     }
@@ -89,19 +118,33 @@ Shader "Hidden/Kino/Bloom"
         float4 d = _MainTex_TexelSize.xyxy * float4(1, 1, -1, 0) * _SampleScale;
 
         half3 s;
-        s  = tex2D(_MainTex, uv - d.xy).rgb;
-        s += tex2D(_MainTex, uv - d.wy).rgb * 2;
-        s += tex2D(_MainTex, uv - d.zy).rgb;
+        s  = decode_hdr(tex2D(_MainTex, uv - d.xy));
+        s += decode_hdr(tex2D(_MainTex, uv - d.wy)) * 2;
+        s += decode_hdr(tex2D(_MainTex, uv - d.zy));
 
-        s += tex2D(_MainTex, uv + d.zw).rgb * 2;
-        s += tex2D(_MainTex, uv       ).rgb * 4;
-        s += tex2D(_MainTex, uv + d.xw).rgb * 2;
+        s += decode_hdr(tex2D(_MainTex, uv + d.zw)) * 2;
+        s += decode_hdr(tex2D(_MainTex, uv       )) * 4;
+        s += decode_hdr(tex2D(_MainTex, uv + d.xw)) * 2;
 
-        s += tex2D(_MainTex, uv + d.zy).rgb;
-        s += tex2D(_MainTex, uv + d.wy).rgb * 2;
-        s += tex2D(_MainTex, uv + d.xy).rgb;
+        s += decode_hdr(tex2D(_MainTex, uv + d.zy));
+        s += decode_hdr(tex2D(_MainTex, uv + d.wy)) * 2;
+        s += decode_hdr(tex2D(_MainTex, uv + d.xy));
 
         return s * (1.0 / 16);
+    }
+
+    // 4-tap bilinear upsampler
+    half3 upsample_4tap(float2 uv)
+    {
+        float4 d = _MainTex_TexelSize.xyxy * float4(-1, -1, +1, +1) * _SampleScale / 2;
+
+        half3 s;
+        s  = decode_hdr(tex2D(_MainTex, uv + d.xy));
+        s += decode_hdr(tex2D(_MainTex, uv + d.zy));
+        s += decode_hdr(tex2D(_MainTex, uv + d.xw));
+        s += decode_hdr(tex2D(_MainTex, uv + d.zw));
+
+        return s * (1.0 / 4);
     }
 
     //
@@ -155,19 +198,19 @@ Shader "Hidden/Kino/Bloom"
     #endif
         m *= saturate((lm - _Threshold) / _Cutoff);
 
-        return half4(m, s0.a);
+        return encode_hdr(m);
     }
 
     half4 frag_downsample(v2f_img i) : SV_Target
     {
-        return half4(downsample_box4x4(i.uv), 0);
+        return encode_hdr(downsample_box4x4(i.uv));
     }
 
     half4 frag_upsample(v2f_multitex i) : SV_Target
     {
-        half4 base = tex2D(_BaseTex, i.uv_base);
+        half3 base = decode_hdr(tex2D(_BaseTex, i.uv_base));
         half3 blur = upsample_9tap(i.uv_main);
-        return half4(base.rgb + blur, 0);
+        return encode_hdr(base + blur);
     }
 
     half4 frag_upsample_final(v2f_multitex i) : SV_Target
